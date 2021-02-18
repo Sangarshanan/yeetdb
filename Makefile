@@ -13,4 +13,4 @@ install:
 	$(PYTHON) -m pip install -r requirements.txt
 
 run:
-	@ $(PYTHON) repl.py
+	@ $(PYTHON) src/repl.py

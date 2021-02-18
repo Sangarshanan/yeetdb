@@ -1,5 +1,7 @@
 import re
 import ast
+import pandas
+from collections import OrderedDict
 
 # Data Definition Language
 ddl = ["create"]
@@ -27,14 +29,21 @@ INSERT INTO [table_name]([column_names]) VALUES([values])
 
 my_whole_db = {}
 
+def create_table(table):
+    my_whole_db[table.__tablename__] = []
 
-def create_table(name, dtypes):
-    my_whole_db[name] = []
 
+class Person:
+    __tablename__ = 'person'
+    def __init__(self):
+        self.id = (int, 5)
+        self.name = (str, 100)
+        self.age = (int, 2)
 
-tablename = "person"
-dtypes = {"id": (int, 5), "name": (str, 100), "age": (int, 2)}
-create_table(tablename, dtypes)
+p = Person()
+dtypes = p.__dict__
+
+create_table(p)
 
 
 class QueryCompiler(object):
@@ -46,21 +55,30 @@ class QueryCompiler(object):
 
     @staticmethod
     def tokenizer(query):
-        query = re.sub(' +', ' ', query).replace(',', '')
+        query = re.sub(' +', ' ', query)
         tokens = [token.lower() for token in query.split(" ")]
         return tokens
 
     @staticmethod
-    def insert_parser(tokens):
+    def inside_bracket(char, evaluate=True):
+        inside_b = re.search(r"\(.*?\)", char)[0]
+        if evaluate:
+            exp = ast.literal_eval(inside_b)
+        else:
+            exp = inside_b[1:-1].split(",")
+        return exp
+
+    def insert_parser(self, tokens):
         tablename = tokens[2].split("(")[0]
         cols = self.inside_bracket(tokens[2], evaluate=False)
         values = self.inside_bracket(tokens[3])
+        return tablename, cols, values
 
     @staticmethod
     def insert(tablename, col_names, values):
         table = my_whole_db[tablename]
         row = []
-        record = dict(zip(col_names, values))
+        record = OrderedDict(zip(col_names, values))
         for key in sorted(record.keys(), key=lambda x: x.lower()):
             value = record[key]
             # dtype is maintained
@@ -78,37 +96,44 @@ class QueryCompiler(object):
         # Columns
         if tokens[1] == '*':
             # Wildcard
-            cols = '*'
+            cols = None
         else:
-            cols = tokens[1:tokens.index('from')]
+            raw_cols = tokens[1:tokens.index('from')]
+            cols = [c.replace(',','') for c in raw_cols]
 
         # Limit
         if 'limit' in tokens:
-            limit = tokens[-1]
+            limit = int(tokens[-1])
             end_of_query = tokens.index('limit')
         else:
-            end_of_query = -2
             limit = None
 
         # Filters
         if 'where' in tokens:
-            filters = tokens[tokens.index('where')+1:end_of_query]
-            print(filters)
-
-        # print(tokens)
-
-    @staticmethod
-    def select(tablename, cols="*", filters={}, limit=None):
-        return my_whole_db[tablename]
-
-    @staticmethod
-    def inside_bracket(char, evaluate=True):
-        inside_b = re.search(r"\(.*?\)", char)[0]
-        if evaluate:
-            exp = ast.literal_eval(inside_b)
+            if limit is None:
+                filters = tokens[tokens.index('where')+1:]
+            else:
+                filters = tokens[tokens.index('where')+1:end_of_query]
+            pd_query = ' '.join(filters).replace('=','==')
+            filters = pd_query
         else:
-            exp = inside_b[1:-1].split(",")
-        return exp
+            filters = None
+
+        return tablename, cols, filters, limit
+
+    @staticmethod
+    def select(tablename, cols, filters, limit):
+        if my_whole_db[tablename]:
+            df = pandas.DataFrame(my_whole_db[tablename], columns=sorted(dtypes.keys()))
+            if filters:
+                df = df.query(filters).reset_index(drop=True)
+            if limit:
+                df = df.sample(limit).reset_index(drop=True)
+            if cols:
+                df = df[cols]
+        else:
+            df = "EMPTY"
+        return df
 
     def parse(self, tokens):
         for token in tokens:
@@ -125,14 +150,9 @@ class QueryCompiler(object):
                     return self.insert(tablename, cols, values)
                 # select
                 if token == "select":
-                    self.select_parser(tokens)
-                    # tablename, cols, filters, limit = self.select_parser(tokens)
-                    # return self.select(tablename, cols, filters, limit)
+                    tablename, cols, filters, limit = self.select_parser(tokens)
+                    return self.select(tablename, cols, filters, limit)
 
     def run(self):
         tokens = self.tokenizer(self.query)
         return self.parse(tokens)
-
-
-q = QueryCompiler("SELECT a, b, c FROM person where a = 10 limit 1")
-print(q.run())
