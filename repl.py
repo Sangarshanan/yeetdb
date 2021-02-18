@@ -36,7 +36,7 @@ def main(database):
         lexer=PygmentsLexer(SqlLexer),
         completer=sql_completer,
     )
-    print_formatted_text("Salutations\n")
+    print_formatted_text("Salutations ! Welcome to YeetDB\n")
     while True:
         try:
             text = session.prompt(
@@ -55,7 +55,7 @@ def main(database):
         else:
             print(message)
 
-    print("\nYeet!")
+    print_formatted_text("\nYeet!")
 
 
 if __name__ == "__main__":
