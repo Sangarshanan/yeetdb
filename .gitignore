@@ -9,6 +9,7 @@
 *.log
 *.pot
 __pycache__/*
+.ipynb_checkpoints/*
 .cache/*
 .*.swp
 */.ipynb_checkpoints/*
@@ -52,5 +53,3 @@ MANIFEST
 # Configuration
 .env
 .credentials
-report.txt
-.kube*
