@@ -1,6 +1,6 @@
 # Yeet DB
 
-A Throwaway Database
+A Throwaway Database under construction 🚧
 
 ```sql
 > make run

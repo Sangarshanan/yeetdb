@@ -10,7 +10,7 @@ from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 
-from sql_compiler import QueryCompiler
+from .sql_compiler import QueryParser
 
 sql_completer = WordCompleter(
     [
@@ -30,7 +30,7 @@ sql_completer = WordCompleter(
 )
 
 
-def main(database):
+def open_repl(database):
     session = PromptSession(
         history=InMemoryHistory(),
         lexer=PygmentsLexer(SqlLexer),
@@ -48,7 +48,7 @@ def main(database):
             break  # Control-D pressed.
 
         try:
-            q = QueryCompiler(text)
+            q = QueryParser(text)
             message = q.run()
         except Exception as e:
             print(repr(e))
@@ -58,10 +58,10 @@ def main(database):
     print_formatted_text("\nYeet!")
 
 
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        db = ":yeet"
-    else:
-        db = sys.argv[1]
+# if __name__ == "__main__":
+#     if len(sys.argv) < 2:
+#         db = ":yeet"
+#     else:
+#         db = sys.argv[1]
 
-    main(db)
+#     main(db)
