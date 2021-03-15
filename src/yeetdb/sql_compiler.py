@@ -66,24 +66,46 @@ class QueryParser(object):
         start_token = tokens[0]
 
         stripped_token = tokens.strip()
+
         # meta commands
-        if stripped_token == ".t":
-            # All tablenames
-            print("Table names")
-            return "\n".join(my_whole_db.keys())
+        # .t -> List all Tables
+        if stripped_token in ('.t'):
+            return tokens
+
+        if stripped_token.startswith("create"):
+            tokens = re.findall(
+                r'create\s+(table|database)\s+([a-zA-Z_]*)', tokens)
+            object, name = parse_tokens(tokens)
+            return object, name
 
         # dml commands
-        if tokens.startswith("insert"):
+        if stripped_token.startswith("insert"):
             # insert
-            tablename, cols, values = self.insert_parser(tokens)
-            return self.insert(tablename, cols, values)
-
-        if tokens.startswith("select"):
-            # select
             tokens = re.findall(
-                r'select\s+(.*?)\s*from\s+(\w*)\s?(where?\s+(.*))?\s?(limit?\s(\d*))?', tokens)
-            cols,tablename,_,filters,_,limit = parse_tokens(tokens)
+                    r'insert\s+into\s+([a-zA-Z_]*).*\((.*?)\).*\s+values.*\((.*?)\)', tokens)
+            tablename, cols, values = parse_tokens(tokens)
+            return tablename, cols, values
+
+        if stripped_token.startswith("select"):
+            # select
+            cols= tablename= filters= limit = ""
+            # Limit            
+            if "limit" in tokens:
+                limit = int(parse_tokens(re.findall(r'limit\s+(\d*)', tokens)))
+                tokens = tokens.split("limit")[0].strip()
+            # Filters
+            if "where" in tokens:
+                filters = parse_tokens(re.findall(r'where\s+(.*)', tokens))
+                tokens = tokens.split("where")[0].strip()
+            # Tablename and Columns
+            tokens = re.findall(
+                r'select\s+(.*?)\s*from\s+(\w*)\s?', tokens)
+            cols,tablename = parse_tokens(tokens)
+
             return cols, tablename, filters, limit
+
+        else:
+            return ParseException("Could not parse the SQL query")
 
     def parse(self):
          # Add space & lowercase

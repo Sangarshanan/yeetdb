@@ -14,3 +14,6 @@ install:
 
 run:
 	@ $(PYTHON) -m yeetdb
+
+test:
+	$(VENV_NAME)/bin/pytest --verbose --disable-pytest-warnings
