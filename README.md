@@ -1,23 +1,28 @@
 # Yeet DB
 
-A Throwaway Database under construction 🚧
+A Throwaway Database 🚧
 
 ```sql
 > make run
-# person is a pre-created table
-# ID - Int(5), NAME - str(100), AGE - int(2)
 
-.t # List all tables
+> .db # current database
+
+# Use the default db or create your own
+> CREATE DATABASE test # create a database
+
+# create a table
+> CREATE TABLE person(id int.5 index,name str.100,age int.2)
+
+> .t # List all tables
 
 # Good insert
-INSERT INTO person(id,age,name) VALUES(1,23,'Abel')
-INSERT INTO person(id,age,name) VALUES(2,29,'Frank')
-INSERT INTO person(id,age,name) VALUES(3,32,'Phoebe')
+INSERT INTO person(id,age,name) VALUES(1,23,Abel)
+INSERT INTO person(id,age,name) VALUES(2,29,Frank)
+INSERT INTO person(id,age,name) VALUES(3,32,Phoebe)
 
 # Bad insert
 INSERT INTO person(id,age,name) VALUES(4)
-INSERT INTO person(id,age,name) VALUES(5,200,'Peppa') # Pigs cant live to 200
-INSERT INTO person(id,age,name) VALUES(6,10,Peppa) # Pigs arent objects
+INSERT INTO person(id,age,name) VALUES(5,200,Peppa) # Pigs cant live to 200
 
 # Queries
 SELECT * FROM person
@@ -31,9 +36,3 @@ SELECT * from person where age < 30 or name = 'Frank'
 ```
 
 A Basic In-Memory database with a very stupid SQL parser
-
-#### TODO
-
-- Persistence
-- Transactions
-- Indexing

@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-import sys
-
 from pygments.lexers.sql import SqlLexer
-
 from prompt_toolkit import PromptSession
 from prompt_toolkit.lexers import PygmentsLexer
 from prompt_toolkit import print_formatted_text
@@ -10,7 +7,7 @@ from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.completion import WordCompleter
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 
-from .sql_compiler import QueryParser
+from .sql_compiler import QueryExecutor
 
 sql_completer = WordCompleter(
     [
@@ -48,20 +45,14 @@ def open_repl(database):
             break  # Control-D pressed.
 
         try:
-            q = QueryParser(text)
-            message = q.run()
-        except Exception as e:
-            print(repr(e))
+            qe = QueryExecutor(text)
+            result, operation, time = qe.run()
+        except Exception as error:
+            print_formatted_text(f"ERROR: {error}")
         else:
-            print(message)
+            if result:
+                print_formatted_text(result)
+            else:
+                print_formatted_text(f"{operation} executed in {round(time, 5)} sec")
 
     print_formatted_text("\nYeet!")
-
-
-# if __name__ == "__main__":
-#     if len(sys.argv) < 2:
-#         db = ":yeet"
-#     else:
-#         db = sys.argv[1]
-
-#     main(db)

@@ -3,7 +3,12 @@ import setuptools
 
 project_dir = Path(__file__).parent
 
-requires = ["prompt-toolkit==3.0.14", "Pygments==2.7.4"]
+requires = [
+    "prompt-toolkit==3.0.14",
+    "Pygments==2.7.4",
+    "pydantic==1.8.2",
+    "tabulate==0.8.9"
+]
 
 def setup_package():
     metadata = dict(

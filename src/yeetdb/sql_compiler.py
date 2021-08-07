@@ -1,5 +1,15 @@
 """Compile Queries."""
+import os
 import re
+import ast
+import time
+import json
+import glob
+import tabulate
+from pathlib import Path
+
+from .utils import create_model_for_table
+from .hash_index import HashIndex, read_hash_index
 
 # Data Definition Language
 ddl = ["create"]
@@ -71,12 +81,15 @@ class QueryParser(object):
         # meta commands
         # .t -> List all Tables
         if stripped_token in (".t"):
-            return tokens
+            return 'LIST_TABLES', tokens
+        # .db -> Current Database
+        if stripped_token in (".db"):
+            return 'CURRENT_DATABASE', tokens
 
         if stripped_token.startswith("create"):
-            tokens = re.findall(r"create\s+(table|database)\s+([a-zA-Z_]*)", tokens)
-            object, name = parse_tokens(tokens)
-            return object, name
+            tokens = re.findall(r"create\s+(table|database)\s+([a-zA-Z_]*)(.*\((.*?)\))?", tokens)
+            object, name, _ , cols = parse_tokens(tokens)
+            return "CREATE", (object, name, cols)
 
         # dml commands
         if stripped_token.startswith("insert"):
@@ -85,7 +98,7 @@ class QueryParser(object):
                 r"insert\s+into\s+([a-zA-Z_]*).*\((.*?)\).*\s+values.*\((.*?)\)", tokens
             )
             tablename, cols, values = parse_tokens(tokens)
-            return tablename, cols, values
+            return "INSERT", (tablename, cols, values)
 
         if stripped_token.startswith("select"):
             # select
@@ -102,7 +115,7 @@ class QueryParser(object):
             tokens = re.findall(r"select\s+(.*?)\s*from\s+(\w*)\s?", tokens)
             cols, tablename = parse_tokens(tokens)
 
-            return cols, tablename, filters, limit
+            return "SELECT", (cols, tablename, filters, limit)
 
         else:
             return ParseException("Could not parse the SQL query")
@@ -110,4 +123,103 @@ class QueryParser(object):
     def parse(self):
         # Add space & lowercase
         tokens = self.query.center(3).lower()
-        return self._parse(tokens)
+        parsed_tokens = self._parse(tokens)
+        return parsed_tokens
+
+class QueryExecutor(object):
+    """Execute the Parsed Query."""
+
+    # Default Database
+    DATABASE = ".yeet"
+    Path(DATABASE).mkdir(parents=True, exist_ok=True)
+
+    def __init__(self, query):
+        super(QueryExecutor, self).__init__()
+        self.query = query
+
+    def run(self):
+        start = time.time()
+        result = None
+        qp = QueryParser(self.query)
+        operation, tokens = qp.parse()
+
+        if operation == "CURRENT_DATABASE":
+            result = f"Current Database: {QueryExecutor.DATABASE}"
+
+        if operation == "LIST_TABLES":
+            _tables = []
+            for file in glob.glob('yeet/*meta.json'):
+                _tables.append(file.split("/")[1].split("_")[0])
+            result = f"Tables:\n{_tables}"
+
+        if operation == "CREATE":
+            _object, name, cols = tokens
+            # create database
+            if _object == "database":
+                if not cols == '': # Database should not have values:
+                    raise Exception("Cannot create database with value entries")
+                else:
+                    if os.path.exists(name):
+                        raise Exception(f"Database {name} already exists switching")
+                    else:
+                        os.mkdir(name)
+                    QueryExecutor.DATABASE = name
+            # create table
+            if _object == "table":
+                table_field = {}
+                split_cols = cols.split(",")
+                for col in split_cols:
+                    col = re.sub(' +', ' ', col) # remove extra space
+                    col_args = col.split(" ")
+                    colname = col_args[0]
+                    dtype, maxlen = col_args[1].split(".")
+                    if len(col_args) == 2:
+                        table_field[colname] = (dtype, int(maxlen))
+                    elif len(col_args) == 3:
+                        table_field[colname] = (dtype, int(maxlen), "index")
+                    else:
+                        raise Exception("Invalid Params")
+                table_meta = json.dumps(table_field)
+                with open(f'{QueryExecutor.DATABASE}/{name}_meta.json', 'w') as f:
+                    f.write(table_meta)
+
+        if operation == "INSERT":
+            tablename, cols, values = tokens
+            with open(f'{QueryExecutor.DATABASE}/{tablename}_meta.json', 'r') as f:
+                table_meta = json.loads(f.read())
+            for key,value in table_meta.items():
+                if len(value) == 3:
+                    _index_col = key
+            tablemodel = create_model_for_table(tablename, table_meta)
+            values = dict(zip(cols.split(","), values.split(",")))
+            for key, value in values.items():
+                _type = table_meta[key][0]
+                if _type == "int":
+                    values[key] = int(values[key])
+                if _type == "str":
+                    values[key] = str(values[key])
+            # Use Pydantic to validate the data
+            tablemodel(**values)
+            tableindex = HashIndex(
+                QueryExecutor.DATABASE,
+                tablename
+            )
+            tableindex.insert(values[_index_col], values)
+        
+        if operation == "SELECT":
+            cols, tablename, filters, limit = tokens
+            tableindex = read_hash_index(
+                dbname = QueryExecutor.DATABASE,
+                tablename = tablename
+            )
+            _index = 1
+            dataset = []
+            while True:
+                row = tableindex.get(_index)
+                if row == "<NAN>":
+                    break
+                dataset.append(ast.literal_eval(row))
+                _index+=1
+            result = tabulate.tabulate([x.values() for x in dataset], dataset[0].keys())
+        end = time.time()
+        return result, operation, end-start
